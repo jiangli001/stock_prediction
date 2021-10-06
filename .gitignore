@@ -1,5 +1,6 @@
 # git 需要忽略的文件
 draft/
+workspace.code-workspace
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
