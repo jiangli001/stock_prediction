@@ -27,4 +27,4 @@ def data_scaler():
 
 
 if __name__ == "__main__":
-    sample_processing("000002.SZ", win_size=2)
+    print(1)
