@@ -6,7 +6,7 @@ import os
 
 
 '''
-这个会xxx
+
 '''
 
 
@@ -115,6 +115,8 @@ if __name__ == "__main__":
         
         #计算好illiquility
         rawdt = SampleProcessing().get_illiquility(rawdt)
+        
+        #把所有数据清理好
         sampledt = SampleProcessing().get_sampledata(rawdt)
         print(sampledt)
         print("\n","-----------------------------------","\n")
