@@ -70,7 +70,7 @@ class SampleProcessing:
         
         #计算TargetValue, 名字为GR
         GR = np.array(dt.ClosePrice[pd:])/np.array(dt.ClosePrice[0:-pd])-1
-        GR = [0]*pd + GR.tolist()
+        GR = GR.tolist() + [0]*pd
         
         #把数据改成一行X天
         if colday >1: #colday大于1，一行天数大于1
@@ -82,10 +82,10 @@ class SampleProcessing:
         
         
         #把GR加上去
-        dt["GR"] = GR
+        dt["GrowthRate"] = GR
         
-        #把均值天数之前的删除，因为之前是没有均值的
-        dt = dt[daynum+1:]
+        #把均值天数之前的删除，因为之前是没有均值的；且把没有GR的删掉
+        dt = dt[daynum+1:-pd]
         
         return dt
             
