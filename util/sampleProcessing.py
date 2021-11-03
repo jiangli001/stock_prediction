@@ -2,7 +2,7 @@ import numpy as np
 from numpy.core.getlimits import _discovered_machar
 import pandas as pd
 import os
-
+import shutil
 
 
 '''
@@ -70,7 +70,7 @@ class SampleProcessing:
         
         #计算TargetValue, 名字为GR
         GR = np.array(dt.ClosePrice[pd:])/np.array(dt.ClosePrice[0:-pd])-1
-        GR = [0]*pd + GR.tolist()
+        GR = GR.tolist() + [0]*pd
         
         #把数据改成一行X天
         if colday >1: #colday大于1，一行天数大于1
@@ -82,17 +82,41 @@ class SampleProcessing:
         
         
         #把GR加上去
-        dt["GR"] = GR
+        dt["GrowthRate"] = GR
         
-        #把均值天数之前的删除，因为之前是没有均值的
-        dt = dt[daynum+1:]
+        #把均值天数之前的删除，因为之前是没有均值的；且把没有GR的删掉
+        dt = dt[daynum+1:-pd]
         
         return dt
-            
+    
+    def split_data(self,dt):
+        '''
+        train data 2019-12-31之前
+        valid 2020.1.1-2020.6.30
+        test 2020.6.30之后
+        '''
+        
+        dt1 = dt.set_index('Date')
+        traindt = dt1[:'2019']
+        testdt = dt1['2020-1-1':'2020-6-30']
+        valdt = dt1['2020-6-30':]
+        
+        return traindt, testdt, valdt
+        
+    
         
 
 if __name__ == "__main__":
+    #删除原来文件，建立新文件夹
+    shutil.rmtree(os.path.join('/root','sampleTest','train'), ignore_errors=True)
+    shutil.rmtree(os.path.join('/root','sampleTest','test'), ignore_errors=True)
+    shutil.rmtree(os.path.join('/root','sampleTest','valid'), ignore_errors=True)
+    os.makedirs(os.path.join('/root','sampleTest','train'))
+    os.makedirs(os.path.join('/root','sampleTest','test'))
+    os.makedirs(os.path.join('/root','sampleTest','valid'))
+        
     for file in os.listdir("/root/rawDataTest"):
+        #读文件
         filepath = '/root/rawDataTest/' + file
         rawdt = pd.read_csv(filepath)
         
@@ -105,8 +129,8 @@ if __name__ == "__main__":
         rawdt = rawdt[(rawdt.Turnover != 0)&(rawdt.TranscationVolume != 0)]
         rawdt['Day'] = range(0,len(rawdt))
         
-        #如果股票IPO至今时间少于2000天，则抛弃
-        if len(rawdt) < 1000:
+        #如果股票IPO至今时间少于1000天，则抛弃
+        if len(rawdt) < 900:
             print("股票{}，因为IPO时间过短被排除".format(file),)
             print("\n","-----------------------------------","\n")
             continue
@@ -121,5 +145,10 @@ if __name__ == "__main__":
         print(sampledt)
         print("\n","-----------------------------------","\n")
         
-        #保存文件
-        sampledt.to_csv(os.path.join('/root','sampleTest', file))
+
+        #删除原来文件并保存新文件
+        traindt, testdt, valdt = SampleProcessing().split_data(sampledt)
+        traindt.to_csv(os.path.join('/root','sampleTest','train', file))
+        testdt.to_csv(os.path.join('/root','sampleTest','test', file))
+        valdt.to_csv(os.path.join('/root','sampleTest','valid', file))
+
