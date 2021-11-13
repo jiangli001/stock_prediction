@@ -98,8 +98,8 @@ class SampleProcessing:
         
         dt1 = dt.set_index('Date')
         traindt = dt1[:'2019']
-        testdt = dt1['2020-1-1':'2020-6-30']
-        valdt = dt1['2020-6-30':]
+        valdt = dt1['2020-1-1':'2020-6-30']
+        testdt = dt1['2020-6-30':]
         
         return traindt, testdt, valdt
         
