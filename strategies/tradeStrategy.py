@@ -46,9 +46,10 @@ for file in os.listdir('/root/sampleTest/test/'):
         dt = pd.read_csv(filepath, index_col= 0)
         # grmax = max(dt['GrowthRate'])
         # grmin = min(dt['GrowthRate'])
-        GrowthRateRandom = [0,0,0,0,0,0,0]
-        for i in range(7,len(dt)):
-            gr = np.average(dt['GrowthRate'].values[i-5:i-2])
+        predict_day = 2
+        GrowthRateRandom = [0]*(predict_day+2)
+        for i in range(predict_day+2,len(dt)):
+            gr = np.average(dt['GrowthRate'].values[(i-predict_day-2):(i-2)])
             GrowthRateRandom = GrowthRateRandom + [gr]
         dt['GrowthRatePredict'] = GrowthRateRandom
         dt.to_csv(os.path.join('/root','sampleTest','test_Random', file))
@@ -100,7 +101,7 @@ class TradeStrategy():
         self.EndDate = '2021-06-30' #结束日期
         self.Initiation = 150000.00 #初始投入
         self.BuyThreshold = 0.05 #买入门槛，两天涨幅预测低于这个数字不买
-        self.TopPredictNum = 6 #waitlist股票数量
+        self.TopPredictNum = 10 #waitlist股票数量
         self.HoldNum = 3 #持仓数量
         self.FilePath = os.path.join('/root','sampleTest','test_Random') #预测好的test数据存放文件夹
         self.Hands = 100 #一手多少股
@@ -179,25 +180,38 @@ class TradeStrategy():
                     HoldingShare = stop_trading
             else:
                 money = (totalasset - self.FeePrepare)/len(Holdinglist) #留一部分钱用来付佣金,剩下的钱均分到需要买的股票
-                if not stop_trading is None:
+                if not stop_trading is None:#如果有停牌股票
                     money = money - sum(stop_trading['Value'])
-                if stop_trading is None: 
+                    stop_num = len(stop_trading['Stock'])
+                    stocks = stop_trading['Stock'] + Holdinglist['Stock'].tolist()[0: (self.HoldNum-stop_num)]
+                    prices = stop_trading['Price'] + Holdinglist['ClosePrice'].tolist()[0: (self.HoldNum - stop_num)]
+                    HoldingHands = stop_trading['Hands']
+                    HoldingValues = stop_trading['Value']
+                    for stock, price in zip(stocks[stop_num:], prices[stop_num:]):
+                        HoldingHand = math.floor(money/(price*self.Hands))
+                        if HoldingHand != 0:
+                            HoldingValue = self.Hands*price*HoldingHand
+                            HoldingHands = HoldingHands + [HoldingHand]
+                            HoldingValues = HoldingValues + [HoldingValue]
+                        else:
+                            stocks = stocks.remove(stock)
+                            prices = prices.remove(price)
+                    
+                else:
                     stocks = Holdinglist['Stock'].tolist()
                     prices = Holdinglist['ClosePrice'].tolist()
                     HoldingHands = []
                     HoldingValues = []
-                else:#如果手上有停牌的
-                    stop_num = len(stop_trading['Stock'])
-                    stocks = stop_trading['Stock'] + Holdinglist['Stock'].tolist()[0: -stop_num]
-                    prices = stop_trading['Price'] + Holdinglist['ClosePrice'].tolist()[0: - stop_num]
-                    HoldingHands = stop_trading['Hands']
-                    HoldingValues = stop_trading['Value']
                     
-                for stock, price in zip(stocks, prices):
-                    HoldingHand = math.floor(money/(price*self.Hands))
-                    HoldingValue = self.Hands*price*HoldingHand
-                    HoldingHands = HoldingHands + [HoldingHand]
-                    HoldingValues = HoldingValues + [HoldingValue]
+                    for stock, price in zip(stocks, prices):
+                        HoldingHand = math.floor(money/(price*self.Hands))
+                        if HoldingHand != 0:
+                            HoldingValue = self.Hands*price*HoldingHand
+                            HoldingHands = HoldingHands + [HoldingHand]
+                            HoldingValues = HoldingValues + [HoldingValue]
+                        else:
+                            stocks = stocks.remove(stock)
+                            prices = prices.remove(price)
                 
                 HoldingShare = {'Stock': stocks, 'Hands': HoldingHands, 'Price': prices, 'Value':HoldingValues}
                     
@@ -441,5 +455,6 @@ if __name__ == "__main__":
     path = os.path.join('/root','sampleTest','test_Random_tradeRecord', 'TradeRecord.csv') #保存trade_record的位置
     TradeRecord = TradeStrategy().get_all_TradeRecord()
     TradeRecord.to_csv(path)    
+
 
 
