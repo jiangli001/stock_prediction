@@ -46,7 +46,7 @@ for file in os.listdir('/root/sampleTest/test/'):
         dt = pd.read_csv(filepath, index_col= 0)
         # grmax = max(dt['GrowthRate'])
         # grmin = min(dt['GrowthRate'])
-        predict_day = 2
+        predict_day = 5
         GrowthRateRandom = [0]*(predict_day+2)
         for i in range(predict_day+2,len(dt)):
             gr = np.average(dt['GrowthRate'].values[(i-predict_day-2):(i-2)])
@@ -98,11 +98,11 @@ class TradeStrategy():
     
     def __init__(self):
         self.StartDate = '2020-06-30'   #开始日期
-        self.EndDate = '2021-06-30' #结束日期
+        self.EndDate = '2021-09-30' #结束日期
         self.Initiation = 150000.00 #初始投入
-        self.BuyThreshold = 0.05 #买入门槛，两天涨幅预测低于这个数字不买
-        self.TopPredictNum = 10 #waitlist股票数量
-        self.HoldNum = 3 #持仓数量
+        self.BuyThreshold = 0.02 #买入门槛，两天涨幅预测低于这个数字不买
+        self.TopPredictNum = 50 #waitlist股票数量
+        self.HoldNum = 5 #持仓数量
         self.FilePath = os.path.join('/root','sampleTest','test_Random') #预测好的test数据存放文件夹
         self.Hands = 100 #一手多少股
         self.Fee = 0.003 #佣金费率
@@ -170,16 +170,19 @@ class TradeStrategy():
                 waitlist1 = self.get_waitlist(date0.strftime('%Y-%m-%d'))
                 
             #拿到waitlist里面，当天的GrowthRatePredict
-            newpredict = self.get_all_GrowthRate(date, waitlist1['Stock']).head(self.HoldNum)
+            newpredict = self.get_all_GrowthRate(date, waitlist1['Stock'].tolist()).head(self.HoldNum)
             
             #判断是否大于买入门槛 
             Holdinglist = newpredict[newpredict['GrowthRatePredict'] > self.BuyThreshold]
+            
             
             #如果出都小于门槛，则不买
             if len(Holdinglist) == 0:
                     HoldingShare = stop_trading
             else:
                 money = (totalasset - self.FeePrepare)/len(Holdinglist) #留一部分钱用来付佣金,剩下的钱均分到需要买的股票
+                stock_remove = []
+                price_remove = []
                 if not stop_trading is None:#如果有停牌股票
                     money = money - sum(stop_trading['Value'])
                     stop_num = len(stop_trading['Stock'])
@@ -194,15 +197,14 @@ class TradeStrategy():
                             HoldingHands = HoldingHands + [HoldingHand]
                             HoldingValues = HoldingValues + [HoldingValue]
                         else:
-                            stocks = stocks.remove(stock)
-                            prices = prices.remove(price)
+                            stock_remove = stock_remove + [stock]
+                            price_remove = price_remove + [price]
                     
                 else:
                     stocks = Holdinglist['Stock'].tolist()
                     prices = Holdinglist['ClosePrice'].tolist()
                     HoldingHands = []
                     HoldingValues = []
-                    
                     for stock, price in zip(stocks, prices):
                         HoldingHand = math.floor(money/(price*self.Hands))
                         if HoldingHand != 0:
@@ -210,9 +212,16 @@ class TradeStrategy():
                             HoldingHands = HoldingHands + [HoldingHand]
                             HoldingValues = HoldingValues + [HoldingValue]
                         else:
-                            stocks = stocks.remove(stock)
-                            prices = prices.remove(price)
+                            stock_remove = stock_remove + [stock]
+                            price_remove = price_remove + [price]
                 
+                try:
+                    for stock, price in zip(stock_remove, price_remove):
+                        stocks.remove(stock)
+                        prices.remove(price)
+                except:
+                    pass
+                        
                 HoldingShare = {'Stock': stocks, 'Hands': HoldingHands, 'Price': prices, 'Value':HoldingValues}
                     
         return HoldingShare    
@@ -440,12 +449,27 @@ class TradeStrategy():
             date_str = date.strftime('%Y-%m-%d')
             tradeday = self.get_waitlist(date_str)
             if not tradeday is None:
-
-                TradeRecord = self.get_Trade_Record(date_str , TradeRecord)
-                # except:
-                #     print("{} is abnormal".format(date_str))
-                #     continue
-        
+                try:
+                    TradeRecord = self.get_Trade_Record(date_str , TradeRecord)
+                
+                except:
+                    print("{} is abnormal".format(date_str))
+                    hs = TradeRecord['HoldingShare'].values[-1]
+                    ta = TradeRecord['TotalAsset'].values[-1]
+                    ia = TradeRecord['InvestedAsset'].values[-1]
+                    ra = TradeRecord['RemainingAsset'].values[-1]
+                    re = TradeRecord['Return'].values[-1]
+                    TradeRecord_update = pd.DataFrame({"Date": date_str, 
+                                    "Buy":[None],
+                                    "Sell":[None],
+                                    "HoldingShare": hs,
+                                    "TotalAsset": ta,
+                                    "InvestedAsset": ia,
+                                    "RemainingAsset":ra,
+                                    "Return":re})
+                    
+                    TradeRecord_update['Date'] = pd.to_datetime(TradeRecord_update['Date'])
+                    TradeRecord = TradeRecord.append(TradeRecord_update.set_index('Date'))        
         return TradeRecord
         
         
@@ -455,6 +479,3 @@ if __name__ == "__main__":
     path = os.path.join('/root','sampleTest','test_Random_tradeRecord', 'TradeRecord.csv') #保存trade_record的位置
     TradeRecord = TradeStrategy().get_all_TradeRecord()
     TradeRecord.to_csv(path)    
-
-
-
