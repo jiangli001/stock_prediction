@@ -102,12 +102,13 @@ class TradeStrategy():
         self.Initiation = 150000.00 #初始投入
         self.BuyThreshold = 0.02 #买入门槛，两天涨幅预测低于这个数字不买
         self.TopPredictNum = 50 #waitlist股票数量
-        self.HoldNum = 5 #持仓数量
+        self.HoldNum = 6 #持仓数量
         self.FilePath = os.path.join('/root','sampleTest','test_Random') #预测好的test数据存放文件夹
         self.Hands = 100 #一手多少股
         self.Fee = 0.003 #佣金费率
         self.Fee_min = 5 #最低佣金
         self.FeePrepare = 500 #预留一部分钱支付手续费
+        self.Harvest = True #每次投资只用初始投资的钱，多余的钱留着空仓
     
    
     def get_all_GrowthRate(self, date, stocks):
@@ -180,7 +181,10 @@ class TradeStrategy():
             if len(Holdinglist) == 0:
                     HoldingShare = stop_trading
             else:
-                money = (totalasset - self.FeePrepare)/len(Holdinglist) #留一部分钱用来付佣金,剩下的钱均分到需要买的股票
+                if self.Harvest:
+                    money = (min(self.Initiation, totalasset) - self.FeePrepare)/len(Holdinglist)
+                else:
+                    money = (totalasset - self.FeePrepare)/len(Holdinglist) #留一部分钱用来付佣金,剩下的钱均分到需要买的股票
                 stock_remove = []
                 price_remove = []
                 if not stop_trading is None:#如果有停牌股票
