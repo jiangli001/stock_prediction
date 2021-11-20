@@ -12,51 +12,6 @@ import matplotlib.pyplot as plt
 from pandas.io.parsers import read_csv
 
 
-#显示所有列
-pd.set_option('display.max_columns', None)
-#显示所有行
-pd.set_option('display.max_rows', None)
-#设置value的显示长度为100，默认为50
-pd.set_option('max_colwidth',100)
-
-
-
-##################################################
-'''
-以下为建立一个用来测试的数据代码，后续需要删除
-'''
-
-#打印设置
-##显示所有列
-pd.set_option('display.max_columns', None)
-##显示所有行
-pd.set_option('display.max_rows', None)
-##设置value的显示长度为100，默认为50
-pd.set_option('max_colwidth',100)
-
-
-#创建文件夹test_Random
-shutil.rmtree(os.path.join('/root','sampleTest','test_Random'), ignore_errors=True)
-os.makedirs(os.path.join('/root','sampleTest','test_Random'))
-
-#test数据生成随机的一列(用5天平均)，仅用来测试，正常时候不用
-for file in os.listdir('/root/sampleTest/test/'):
-        #读文件
-        filepath = '/root/sampleTest/test/' + file
-        dt = pd.read_csv(filepath, index_col= 0)
-        # grmax = max(dt['GrowthRate'])
-        # grmin = min(dt['GrowthRate'])
-        predict_day = 5
-        GrowthRateRandom = [0]*(predict_day+2)
-        for i in range(predict_day+2,len(dt)):
-            gr = np.average(dt['GrowthRate'].values[(i-predict_day-2):(i-2)])
-            GrowthRateRandom = GrowthRateRandom + [gr]
-        dt['GrowthRatePredict'] = GrowthRateRandom
-        dt.to_csv(os.path.join('/root','sampleTest','test_Random', file))
-
-########################################结束
-
-
 '''
 以下为回测逻辑
 模型更新：需要在模型模块完成
@@ -85,22 +40,13 @@ TopPredict的股票需要预测涨幅需要大于 BuyThreshold
 
 
 
-
-# d = (pd.DataFrame({'A':[[1,2,3]]}).append(pd.DataFrame({'A':[[1,2,3],[22]]})))
-# d.reset_index(drop=True)
-# dict(zip(['1','2','3'],['a','b','c']))
-# StartDate-datetime.timedelta(days=1)
-# datetime.datetime.strptime('2020-01-03', "%Y-%m-%d").strftime('%Y-%m-%d')
-
-
-
 class TradeStrategy():
     
     def __init__(self):
         self.StartDate = '2020-06-30'   #开始日期
         self.EndDate = '2021-09-30' #结束日期
         self.Initiation = 150000.00 #初始投入
-        self.BuyThreshold = 0.02 #买入门槛，两天涨幅预测低于这个数字不买
+        self.BuyThreshold = 0.03 #买入门槛，两天涨幅预测低于这个数字不买
         self.TopPredictNum = 50 #waitlist股票数量
         self.HoldNum = 6 #持仓数量
         self.FilePath = os.path.join('/root','sampleTest','test_Random') #预测好的test数据存放文件夹
@@ -480,6 +426,14 @@ class TradeStrategy():
 
 
 if __name__ == "__main__":
+    
+    #显示所有列
+    pd.set_option('display.max_columns', None)
+    #显示所有行
+    pd.set_option('display.max_rows', None)
+    #设置value的显示长度为100，默认为50
+    pd.set_option('max_colwidth',100)
+    
     path = os.path.join('/root','sampleTest','test_Random_tradeRecord', 'TradeRecord.csv') #保存trade_record的位置
     TradeRecord = TradeStrategy().get_all_TradeRecord()
     TradeRecord.to_csv(path)    
