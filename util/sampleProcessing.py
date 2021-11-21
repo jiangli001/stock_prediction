@@ -145,8 +145,10 @@ if __name__ == "__main__":
         print(sampledt)
         print("\n","-----------------------------------","\n")
         
+
         #删除原来文件并保存新文件
         traindt, testdt, valdt = SampleProcessing().split_data(sampledt)
         traindt.to_csv(os.path.join('/root','sampleTest','train', file))
         testdt.to_csv(os.path.join('/root','sampleTest','test', file))
         valdt.to_csv(os.path.join('/root','sampleTest','valid', file))
+
