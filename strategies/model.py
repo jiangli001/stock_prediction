@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd 
 import datetime
 import os
+import warnings
+import shutil
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
@@ -16,23 +18,41 @@ from sklearn.neighbors import KNeighborsClassifier
 
 from sklearn.model_selection import cross_val_score
 
+warnings.filterwarnings("ignore")
+
 d3= []
 a = []
 for file in os.listdir('/root/sampleTest/train/'):
     #读文件
     filepath = '/root/sampleTest/train/' + file
-    d1 = pd.read_csv(filepath, index_col= 0)['2016/12/31':datetime.datetime.now().strftime('%y/%m/%d')].iloc[:,3:]
-    d1 = d1.fillna(method='ffill')
+    df = pd.read_csv(filepath, index_col= 0)['2016/12/31':datetime.datetime.now().strftime('%y/%m/%d')].iloc[:,3:]
+    df = df.fillna(method='ffill')
+    d1 = df.iloc[:,0:33]
+    d1_s = StandardScaler().fit_transform(d1)
+    d1_t= pd.DataFrame(d1_s)
     d2_x = []
-    for i in range(0,len(d1.index)-5):
-        a.append(d1.iloc[i+5,-1])
-        d1_s = StandardScaler().fit_transform(d1)
-        d1_t= pd.DataFrame(d1_s)
-        d2_x.append(pd.concat([d1_t.iloc[i,0:33],d1_t.iloc[i+1,0:33],d1_t.iloc[i+2,0:33],d1_t.iloc[i+3,0:33],d1_t.iloc[i+4,0:33]]))
+    for i in range(0,len(df.index)-4):
+        a.append(df.iloc[i+5,-1])
+        d2_x.append(pd.concat([d1_t.iloc[i,:],d1_t.iloc[i+1,:],d1_t.iloc[i+2,:],d1_t.iloc[i+3,:],d1_t.iloc[i+4,:]]))
         # d2_x.append(np.hstack([d1_t[i,0:33],d1_t[i+1,0:33],d1_t[i+2,0:33],d1_t[i+3,0:33],d1_t[i+4,0:33]]))
     d3.append(pd.concat(d2_x,axis = 1).T)
 x = pd.concat(d3,axis = 0).values
 x
+
+# fp = '/root/sampleTest/train/000001.SZ.csv'
+# df = pd.read_csv(fp, index_col= 0)['2016/12/31':datetime.datetime.now().strftime('%y/%m/%d')].iloc[:,3:]
+# d1 = df.fillna(method='ffill')
+# d2_x = []
+# a=[]
+# for i in range(0,len(d1.index)-5):
+#     a.append(d1.iloc[i+5,-1])
+#     d1_s = StandardScaler().fit_transform(d1)
+#     print(d1_s)
+#     d1_t= pd.DataFrame(d1_s)
+#     d2_x.append(pd.concat([d1_t.iloc[i,0:33],d1_t.iloc[i+1,0:33],d1_t.iloc[i+2,0:33],d1_t.iloc[i+3,0:33],d1_t.iloc[i+4,0:33]]))
+# d2_x
+
+
 
 y = []
 for i in range(0,len(a)): 
@@ -69,11 +89,12 @@ grid_forest = GridSearchCV(RandomForestClassifier(), forest_params, cv=5)
 grid_forest.fit(x, y)
 # Random Forest best estimator
 random_forest = grid_forest.best_estimator_
+random_forest = RandomForestClassifier(max_depth=3, max_features='sqrt', n_estimators=500)
 grid_forest.best_estimator_# Logistic Regression 
 forest_score = cross_val_score(random_forest, x, y, cv=5)
 print('Random Forest Classifier Cross Validation Score', round(forest_score.mean() * 100, 2).astype(str) + '%')
 rf=random_forest.fit(x, y)
-joblib.dump(rf,'random_forest.model')
+joblib.dump(rf,'/root/kadieyan/stock_prediction/strategies/random_forest.model')
 # RandomForestClassifier(max_depth=3, max_features='sqrt', n_estimators=500) Random Forest Classifier Cross Validation Score 54.42%
 
 # # Support Vector Classifier
@@ -96,6 +117,9 @@ tree_clf = grid_tree.best_estimator_
 grid_tree.best_estimator_
 tree_score = cross_val_score(tree_clf, x, y, cv=5)
 print('DecisionTree Classifier Cross Validation Score', round(tree_score.mean() * 100, 2).astype(str) + '%')
+tree_clf = DecisionTreeClassifier(max_depth=2, min_samples_leaf=5)
+dtc=tree_clf.fit(x, y)
+joblib.dump(dtc,'/root/kadieyan/stock_prediction/strategies/decision_tree.model')
 #DecisionTreeClassifier(max_depth=2, min_samples_leaf=5) DecisionTree Classifier Cross Validation Score 52.85%
 
 # KNearest
@@ -107,33 +131,85 @@ knears_neighbors = grid_knears.best_estimator_
 grid_knears.best_estimator_
 knears_score = cross_val_score(knears_neighbors, x, y, cv=5)
 print('Knears Neighbors Cross Validation Score', round(knears_score.mean() * 100, 2).astype(str) + '%')
+knears_neighbors = KNeighborsClassifier(n_neighbors=4)
+knn=knears_neighbors.fit(x, y)
+joblib.dump(knn,'/root/kadieyan/stock_prediction/strategies/knears_neighbors.model')
 # KNeighborsClassifier(n_neighbors=4)
 
 
-def random_forest(predict_day, dt):
-    from sklearn.model_selection import cross_val_predict
-    random_forest = RandomForestClassifier(max_depth=3, max_features='sqrt', n_estimators=500)
-    d1 = dt.fillna(method='ffill')
+def random_forest(dt):
+    rf = joblib.load('/root/kadieyan/stock_prediction/strategies/random_forest.model')
+    df = dt.iloc[:,3:36]
+    df = df.fillna(method='ffill')
+    d1_s = StandardScaler().fit_transform(df)
+    d1_t= pd.DataFrame(d1_s)
     d2_x = []
-    for i in range(0,len(d1.index)-5):
-        a.append(d1.iloc[i+5,-1])
-        d1_t = StandardScaler().fit(d1)
-        d2_x.append(pd.concat([d1_t.iloc[i,0:33],d1_t.iloc[i+1,0:33],d1_t.iloc[i+2,0:33],d1_t.iloc[i+3,0:33],d1_t.iloc[i+4,0:33]]))
-        x = pd.concat(d2,axis = 0).values
-    forest_pred = cross_val_predict(random_forest, X_train_std, ysm_train, cv=5)    
+    for i in range(0,len(df)-4):
+        d2_x.append(pd.concat([d1_t.iloc[i,:],d1_t.iloc[i+1,:],d1_t.iloc[i+2,:],d1_t.iloc[i+3,:],d1_t.iloc[i+4,:]]))
+    x = pd.concat(d2_x,axis = 1).T.values
+    y = np.concatenate(([0,0,0,0],rf.predict(x)))
+    return y    
+
+def decision_tree(dt):
+    rf = joblib.load('/root/kadieyan/stock_prediction/strategies/decision_tree.model')
+    df = dt.iloc[:,3:36]
+    df = df.fillna(method='ffill')
+    d1_s = StandardScaler().fit_transform(df)
+    d1_t= pd.DataFrame(d1_s)
+    d2_x = []
+    for i in range(0,len(df)-4):
+        d2_x.append(pd.concat([d1_t.iloc[i,:],d1_t.iloc[i+1,:],d1_t.iloc[i+2,:],d1_t.iloc[i+3,:],d1_t.iloc[i+4,:]]))
+    x = pd.concat(d2_x,axis = 1).T.values
+    y = np.concatenate(([0,0,0,0],rf.predict(x)))
+    return y   
+
+def knearest(dt):
+    rf = joblib.load('/root/kadieyan/stock_prediction/strategies/knears_neighbors.model')
+    df = dt.iloc[:,3:36]
+    df = df.fillna(method='ffill')
+    d1_s = StandardScaler().fit_transform(df)
+    d1_t= pd.DataFrame(d1_s)
+    d2_x = []
+    for i in range(0,len(df)-4):
+        d2_x.append(pd.concat([d1_t.iloc[i,:],d1_t.iloc[i+1,:],d1_t.iloc[i+2,:],d1_t.iloc[i+3,:],d1_t.iloc[i+4,:]]))
+    x = pd.concat(d2_x,axis = 1).T.values
+    y = np.concatenate(([0,0,0,0],rf.predict(x)))
+    return y 
 ########################
 
-#创建文件夹test_Random
-shutil.rmtree(os.path.join('/root','sampleTest','test_Random_Forest'), ignore_errors=True)
-os.makedirs(os.path.join('/root','sampleTest','test_Random_Forest'))
+fp = '/root/sampleTest/test/000001.SZ.csv'
+df = pd.read_csv(fp, index_col= 0)
+dd = knearest(df)
+dd
+print(len(dd))
+print(len(df))
 
-#test数据生成随机的一列(用5天平均)，仅用来测试，正常时候不用
+#创建文件夹
+shutil.rmtree(os.path.join('/root','sampleTest','test_Knears_Neighbors'), ignore_errors=True)
+
+os.makedirs(os.path.join('/root','sampleTest','test_Random_Forest'))
 for file in os.listdir('/root/sampleTest/test/'):
         #读文件
         filepath = '/root/sampleTest/test/' + file
         dt = pd.read_csv(filepath, index_col= 0)
-        dt['GrowthRatePredict'] = random_forest(5, dt)
+        dt['GrowthRatePredict'] = random_forest(dt)
         dt.to_csv(os.path.join('/root','sampleTest','test_Random_Forest', file))
+
+os.makedirs(os.path.join('/root','sampleTest','test_Decision_Tree'))
+for file in os.listdir('/root/sampleTest/test/'):
+        #读文件
+        filepath = '/root/sampleTest/test/' + file
+        dt = pd.read_csv(filepath, index_col= 0)
+        dt['GrowthRatePredict'] = decision_tree(dt)
+        dt.to_csv(os.path.join('/root','sampleTest','test_Decision_Tree', file))
+        
+os.makedirs(os.path.join('/root','sampleTest','test_Knears_Neighbors'))
+for file in os.listdir('/root/sampleTest/test/'):
+        #读文件
+        filepath = '/root/sampleTest/test/' + file
+        dt = pd.read_csv(filepath, index_col= 0)
+        dt['GrowthRatePredict'] = knearest(dt)
+        dt.to_csv(os.path.join('/root','sampleTest','test_Knears_Neighbors', file))
         
         
         
