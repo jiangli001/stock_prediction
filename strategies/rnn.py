@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import datetime
 import warnings
 warnings.filterwarnings("ignore")
 import tensorflow as tf
@@ -9,7 +10,8 @@ from tensorflow.keras import models
 from tensorflow.keras import models
 sys.path.append("..")
 sys.path.append("../..")
-from stock_prediction.util.embedding import Embedding
+from stock_prediction.util.getSampleData import get_data
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 @tf.function
 def mse(y, pred):
@@ -21,7 +23,7 @@ def rmse(y, pred):
 
 class RNN(object):
     def __init__(self, name, stock_id, input_strategy=1, training_model="LSTM", stateful=True,
-                 return_sequences=True, batch_size=1, input_size=33,
+                 return_sequences=True, input_size=33,
                  rnn_output_size=[], rnn_activation="tanh", dense_output_size=[], dense_activation="",
                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss="rmse",
                  sample_path="/root/sampleTest", seed=2021,
@@ -45,7 +47,6 @@ class RNN(object):
                 Defaults to LSTM
             stateful (bool, optional): 是否有状态. Defaults to True.
             return_sequences (bool, optional): 是否返回序列. Defaults to True.
-            batch_size (int, optional): Defaults to 1.
             input_size (int, optional): [description]. Defaults to 33.
             rnn_output_size (list, optional): rnn 隐藏层 units 大小，list的长度代表有多少层rnn. Defaults to [].
             rnn_activation (str, optional): 激活函数, "sigmoid", "tahn", "relu"等. Defaults to "tanh".
@@ -80,7 +81,6 @@ class RNN(object):
         
         self.stateful = stateful
         self.return_sequences = return_sequences
-        self.batch_size = batch_size
         
         self.input_size = input_size
         
@@ -140,81 +140,27 @@ class RNN(object):
         print(self.__dict__)
         print("===================================")
         
-    def _get_data(self, stage=["train"], union=[]):
-        """根据 self.input_strategy 获得数据
-
-        Args:
-            stage (list, optional): ["train", "valid", "test"]，想要获得的数据。可返回多个.
-                example1:
-                    X_train, y_train = self._get_dat(["train"])
-                    X_valid, y_valid = self._get_dat(["valid"])
-                    X_test, y_test = self._get_dat(["test"])
-                example2:
-                    X_train, y_train, X_valid, y_valid = self._get_dat(["train", "valid"])
-                    X_valid, y_valid, X_test, y_test = self._get_dat(["valid", "test"])
-                Defaults to ["train"].
-            union (list, optional): 需要合并的数据集,例如["train", "valid"],则返回的x,y会将这两份数据集合并.
-                example1:
-                    X_train, y_train, X_valid, y_valid = self._get_dat(["train", "valid"])
-                    X, y = self._get_dat(stage=["train", "valild"], union=["train", "valid"])
-                example2:
-                    X, y, X_test, y_test = self._get_dat(stage=["train", "valild", "test"], union=["train", "valid"])
-                Defaults to [].
-        """
-        assert (len(stage) >= len(union)),\
-            "the length of `union` must be smaller than or equal to that of `stage`"
-            
-        train_data, valid_data, test_data = None, None, None
-        if "train" in stage: train_data = pd.read_csv(self.train_path)
-        if "valid" in stage: valid_data = pd.read_csv(self.valid_path)
-        if "test" in stage: test_data = pd.read_csv(self.test_path)
-        
-        res = []
-        data_dict = {"train": train_data, "valid": valid_data, "test": test_data}
-        
-        for _s in stage:
-            data = data_dict[_s]     
-            X, y = data.iloc[:, 4:-1].values, data.iloc[:, -1].values
-            if self.input_strategy == 1:
-                X = tf.cast(tf.expand_dims(X, axis=0), tf.float32, name="x_cast") # [1, samlples, 33]
-                X = tf.nn.l2_normalize(X, axis=-1)
-                if len(tf.shape(y)) == 1:
-                    y = tf.multiply(tf.cast(tf.reshape(y, [1, -1, 1]), tf.float32, name="y_cast"), 100)  # [1, samples, 1]
-                res.append(X)
-                res.append(y)
-            elif self.input_strategy == 2:
-                return 
-        
-            elif self.input_strategy == 3:
-                X = tf.cast(tf.expand_dims(X, axis=0), tf.float32, name="x_cast") # [1, samlples, 33]
-                y = tf.multiply(tf.cast(y, tf.float32, name="y_cast"), 1)  # [samples, 1]
-                res.append(X)
-                res.append(y)
-        return res  
-
-    @tf.function
-    def _printbar(self):
-        today_ts = tf.timestamp()%(24*60*60)
-
-        hour = tf.cast(today_ts//3600+8,tf.int32)%tf.constant(24)
-        minite = tf.cast((today_ts%3600)//60,tf.int32)
-        second = tf.cast(tf.floor(today_ts%60),tf.int32)
-        return (hour, minite, second)
-
     def _build(self):
         x_input = tf.keras.Input(shape=(None, self.input_size), batch_size=1, dtype=tf.float32) # 固定只有 1 个batch_size
         x = x_input
-        for i in tf.range(self.rnn_layers_num-1):
-            x = self.rnn(units=self.rnn_output_size[i], activation=self.rnn_activation, return_sequences=True, stateful=self.stateful)(x)
-        x = self.rnn(units=self.rnn_output_size[-1], activation=self.rnn_activation, return_sequences=self.return_sequences, stateful=self.stateful)(x)
-        if self.input_strategy == 1 and self.rnn_output_size[-1] != 1:
-            x = self.rnn(units=1, activation=None, return_sequences=self.return_sequences, stateful=self.stateful)(x)
+        
+        if self.rnn_output_size[0] > 0:
+            for i in tf.range(self.rnn_layers_num):
+                x = self.rnn(units=self.rnn_output_size[i], activation=self.rnn_activation, return_sequences=True, stateful=self.stateful)(x)
+            # x = self.rnn(units=self.rnn_output_size[-1], activation=self.rnn_activation, return_sequences=self.return_sequences, stateful=self.stateful)(x)
+            if self.input_strategy == 1 and self.rnn_output_size[-1] != 1:
+                x = self.rnn(units=1, activation=None, return_sequences=self.return_sequences, stateful=self.stateful)(x)
         
         if self.input_strategy == 3:
-            x = tf.reshape(x, [-1, self.rnn_output_size[-1]])
-            for i in tf.range(self.dense_layers_num-1):
-                x = tf.keras.layers.Dense(self.dense_output_size[i], activation=self.dense_activation)
-        
+            if self.rnn_output_size[0] > 0:
+                x = tf.reshape(x, [-1, self.rnn_output_size[-1]])
+            else:
+                x = tf.reshape(x, [-1, self.input_size])
+            for i in tf.range(self.dense_layers_num):
+                x = tf.keras.layers.Dense(self.dense_output_size[i], activation=self.dense_activation)(x)
+            if self.dense_output_size and self.dense_output_size[-1] != 1:
+                x = tf.keras.layers.Dense(1, activation=self.dense_activation)(x)
+            x = tf.reshape(x, [1, -1, 1])
         self.model = models.Model(inputs=[x_input], outputs=x, name=self.name)
         self.model.summary()
         
@@ -225,8 +171,6 @@ class RNN(object):
             loss = self.loss(y, predictions)
         gradients = tape.gradient(loss, self.model.trainable_variables)
         # 梯度裁剪
-        for i, gradient in enumerate(gradients):
-            gradients[i] = tf.clip_by_value(gradient, 1e-6, 1.0-1e-6)
             
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         
@@ -241,17 +185,17 @@ class RNN(object):
 
     def fit(self, epochs=10, show_epoch=1):
         cur_patience = 0
-        train_X, train_y, valid_X, valid_y = self._get_data(stage=["train", "valid"])
+        train_X, train_y = get_data(path=self.train_path, input_strategy=self.input_strategy)
+        valid_X, valid_y = get_data(path=self.valid_path, input_strategy=self.input_strategy)
         for i in tf.range(epochs):
             self._train_step(train_X, train_y)
             self._valid_step(valid_X, valid_y)
-            logs = '{}:{}:{}: Epoch={}, Loss:{}, Valid Loss:{}'
+            cur_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logs = '{}: Stock_id={}, Epoch={}, Loss:{}, Valid Loss:{}'
             if i%show_epoch ==0:
-                hour, minite, second = self._printbar()
                 tf.print(tf.strings.format(logs,
-                                           (hour, minite, second, i, self.train_loss.result(), self.valid_loss.result())))
-                tf.print("")
-                
+                                           (cur_time, self.stock_id, i, self.train_loss.result(), self.valid_loss.result())))
+            
             # early stop
             if self.patience is not None:
                 if self.valid_loss.result() > self.min_eval_loss:
@@ -269,10 +213,10 @@ class RNN(object):
             if self.stateful:
                 self.model.reset_states()
         
-    def predict(self, stage="test", save=False):
-        x, y = self._get_data([stage])
-        pred = self.model.predict(x)
-        print(tf.concat([y/100, pred/100], axis=-1))
+    def predict(self, save=False):
+        x, y = get_data(path=self.test_path, input_strategy=self.input_strategy)
+        pred = self.model(x, training=False)
+        print(tf.concat([y, pred], axis=-1))
         loss = self.loss(y, pred)
         print(loss)
         if save:
@@ -288,10 +232,10 @@ class RNN(object):
         
 if __name__ == "__main__":    
     model = RNN(name="RNN", stock_id="000002.SZ", input_strategy=1, training_model="RNN", stateful=True,
-                return_sequences=True, batch_size=1, input_size=33,
+                return_sequences=True, input_size=33,
                 rnn_output_size=[16, 8, 4], rnn_activation="sigmoid", dense_output_size=[], dense_activation="",
                 optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss="mse",
                 sample_path="/root/sampleTest", patience=5, reload=True
                 )
     model.fit(epochs=100)
-    model.predict("train")
+    model.predict(False)
