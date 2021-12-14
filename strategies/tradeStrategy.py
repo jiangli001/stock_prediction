@@ -49,7 +49,7 @@ class TradeStrategy():
         self.BuyThreshold = 0.03 #买入门槛，两天涨幅预测低于这个数字不买
         self.TopPredictNum = 50 #waitlist股票数量
         self.HoldNum = 6 #持仓数量
-        self.FilePath = os.path.join('/root','sampleTest','test_Random') #预测好的test数据存放文件夹
+        self.FilePath = os.path.join('/root','sampleTest','test_Knears_Neighbors') #预测好的test数据存放文件夹
         self.Hands = 100 #一手多少股
         self.Fee = 0.003 #佣金费率
         self.Fee_min = 5 #最低佣金
@@ -434,6 +434,6 @@ if __name__ == "__main__":
     #设置value的显示长度为100，默认为50
     pd.set_option('max_colwidth',100)
     
-    path = os.path.join('/root','sampleTest','test_Random_tradeRecord', 'TradeRecord.csv') #保存trade_record的位置
+    path = os.path.join('/root','sampleTest','test_KNN_tradeRecord', 'TradeRecord.csv') #保存trade_record的位置
     TradeRecord = TradeStrategy().get_all_TradeRecord()
     TradeRecord.to_csv(path)    
