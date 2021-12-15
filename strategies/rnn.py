@@ -163,7 +163,7 @@ class RNN(object):
             x = tf.reshape(x, [1, -1, 1])
         self.model = models.Model(inputs=[x_input], outputs=x, name=self.name)
         self.model.summary()
-        
+                
     @tf.function
     def _train_step(self, X, y):
         with tf.GradientTape() as tape:
@@ -171,7 +171,7 @@ class RNN(object):
             loss = self.loss(y, predictions)
         gradients = tape.gradient(loss, self.model.trainable_variables)
         # 梯度裁剪
-            
+        
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         
         self.train_loss.update_state(loss)
@@ -203,7 +203,6 @@ class RNN(object):
                     if cur_patience >= self.patience:
                         tf.print(tf.strings.format("Early Stop at epoch: {}, cur loss is {}, the best loss is {}",
                                  (i, self.valid_loss.result(), self.min_eval_loss)))
-                        
                         break
                 else:
                     self.min_eval_loss = self.valid_loss.result()
